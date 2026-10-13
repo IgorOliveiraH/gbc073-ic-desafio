@@ -7,8 +7,10 @@ Gera painel.pdf a partir de experimentos.csv e logs/.
 Páginas:
   1. os sinais alinhados no mesmo eixo de passos (perda, ||g||, ||theta||, eta_t,
      razão de atualização) para a melhor configuração, a baseline, a melhor com
-     Muon e uma instável
-  2. sinais por camada (primeira, do meio, última): ||g|| e razão de atualização
+     Muon e uma instável. Quando a melhor já é com Muon, o lugar da "melhor com
+     Muon" é ocupado pela melhor SEM Muon, para comparação
+  2. sinais por camada (primeira, do meio, última): ||g||, ||theta|| e razão de
+     atualização (compara o Muon com o AdamW)
   3. métrica de validação x eta, por otimizador (varredura)
   4. agendas: métrica por otimizador x agenda e eta_t de cada agenda
   5. confirmação com 3 sementes (média ± desvio) contra a baseline

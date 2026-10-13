@@ -116,7 +116,7 @@ Perda e acurácia de validação são registradas a cada 100 passos. Os logs fic
 | `protocolo.py` | roda o protocolo inteiro em paralelo; é retomável, pois reaproveita ids já no CSV |
 | `experimentos.csv` | uma linha por execução: configuração, métrica de validação, divergiu?, tempo e comando |
 | `logs/` | sinais de todas as execuções |
-| `painel.py` → `painel.pdf` | sinais alinhados (melhor, baseline, melhor sem Muon, instável), sinais por camada, métrica × η, agendas e confirmação |
+| `painel.py` → `painel.pdf` | sinais alinhados para a melhor (que já é a melhor com Muon), a baseline, a melhor sem Muon (no lugar da repetida) e uma instável; sinais por camada; métrica × η; agendas; confirmação |
 | `slide.py` → `slide.pdf` | o slide de 3 minutos |
 
 ## Reproduzir
