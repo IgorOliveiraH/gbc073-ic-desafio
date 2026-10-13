@@ -20,3 +20,17 @@ Este repositório contém a submissão do Desafio 1, cujo objetivo é criar um m
 ## Arquivos
 * `submissao.py`: Código-fonte com a classe de mapeamento.
 * `Apresentacao_Desafio1.pdf`: Slides detalhando a evolução matemática e arquitetural do modelo.
+
+---
+
+# Desafio 3: O melhor treino para o seu problema
+A pasta [`desafio3/`](desafio3/) parte da rede do Desafio 2 (48 camadas, sem normalização,
+LeakyReLU + inicialização por Monte Carlo) treinada em Fashion-MNIST. O protocolo compara
+6 otimizadores, incluindo o Muon, e 4 agendas de η, todos com o mesmo orçamento.
+
+**Receita vencedora:** Muon (η = 3e-3) + AdamW (η = 3e-4) com agenda cosseno.
+* Validação: **0,8850 ± 0,0029**, contra 0,6275 ± 0,1167 da baseline (Adam 1e-3 constante).
+* Teste: **0,8791 ± 0,0004**.
+
+Detalhes, diagnóstico pelos sinais e reprodução estão em [`desafio3/README.md`](desafio3/README.md).
+Os entregáveis são `painel.pdf` e `slide.pdf`.

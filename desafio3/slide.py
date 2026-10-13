@@ -18,7 +18,19 @@ import treino
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 
-DIAGNOSTICO = "(preencher)"
+DIAGNOSTICO = (
+    "• Baseline (Adam, η=1e-3 constante): razão de atualização ≈2×10⁻³ na 1ª e na última\n"
+    "  camada (acima da referência 10⁻³), picos de ‖g‖ (até 100) seguidos de saltos na perda\n"
+    "  (validação cai a 25% no passo 1200 e a 10% no 2800) e ‖θ‖ da 1ª camada crescendo sem\n"
+    "  estabilizar (15,9→21,4): passo grande demais e sem decaimento — o resultado final\n"
+    "  depende de onde o treino parou (0,55 a 0,76 entre sementes).\n"
+    "• η ajustada + cosseno: η_t→0 no fim e a perda \"assenta\" no vale; o desvio entre\n"
+    "  sementes cai de 0,117 para 0,003.\n"
+    "• Por que Muon: o passo ortogonalizado faz a camada do meio mudar ~6,6×10⁻⁴ por passo,\n"
+    "  mesmo com ‖g‖ 16× menor que o da 1ª camada; no AdamW ela anda 3×10⁻⁴ (metade).\n"
+    "  Perda de treino 0,19 vs 0,29 → +0,45 p.p. de validação, vencendo nas 3 sementes.\n"
+    "• Limite: com η=0,03 o Muon diverge (‖θ‖ 109→200, ‖g‖×200, razão ~10⁻²)."
+)
 
 
 def main():
@@ -56,15 +68,21 @@ def main():
         txt += (f"\nTeste (usado uma vez):  {statistics.mean(tv):.4f} ± "
                 f"{statistics.stdev(tv):.4f}   vs   {statistics.mean(tb):.4f} ± "
                 f"{statistics.stdev(tb):.4f}")
-    fig.text(0.04, 0.665, txt, fontsize=12, family="DejaVu Sans", linespacing=1.6)
+    alt = ("adamw", 3e-4, "", "wsd")
+    if alt in com3:
+        d = [com3[venc][s]["acc_val"] - com3[alt][s]["acc_val"] for s in (0, 1, 2)]
+        txt += (f"\nMelhor sem Muon (AdamW η=3e-4 + WSD): {media(alt):.4f} ± {desvio(alt):.4f} — "
+                f"Muon vence nas 3 sementes, {statistics.mean(d):+.4f} ± {statistics.stdev(d):.4f}"
+                " (margem ≈ desvio)")
+    fig.text(0.04, 0.635, txt, fontsize=11.5, family="DejaVu Sans", linespacing=1.6)
 
-    fig.text(0.04, 0.60, "Diagnóstico lido nos sinais", fontsize=14, weight="bold")
-    fig.text(0.04, 0.575, DIAGNOSTICO, fontsize=11.5, va="top", linespacing=1.5, wrap=True)
+    fig.text(0.04, 0.575, "Diagnóstico lido nos sinais", fontsize=14, weight="bold")
+    fig.text(0.04, 0.55, DIAGNOSTICO, fontsize=10.2, va="top", linespacing=1.5, wrap=True)
 
     # mini-painel: mesmo eixo de passos
     lv = painel.ler_log(rv["id"])
     lb = painel.ler_log(com3[base][0]["id"])
-    eixos = [fig.add_axes([0.60, 0.53 - 0.155 * i, 0.37, 0.14]) for i in range(3)]
+    eixos = [fig.add_axes([0.665, 0.50 - 0.15 * i, 0.31, 0.13]) for i in range(3)]
     for lg, cor, rot in ((lb, painel.CORES["baseline"], "baseline"),
                          (lv, painel.CORES["melhor"], "vencedora")):
         p = lg["passo"]
@@ -77,6 +95,7 @@ def main():
     eixos[1].set_yscale("log")
     eixos[2].set_ylabel("η_t", fontsize=9)
     eixos[2].set_yscale("log")
+    eixos[2].set_ylim(1e-6, 1e-2)
     eixos[2].set_xlabel("passo (semente 0)", fontsize=9)
     eixos[0].legend(fontsize=8, loc="lower right")
     for a in eixos:

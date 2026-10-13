@@ -28,7 +28,11 @@ import numpy as np
 import treino
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-CORES = {"melhor": "#1b6ca8", "baseline": "#6b6b6b", "muon": "#d1495b", "instavel": "#edae49"}
+CORES = {"melhor": "#d1495b", "baseline": "#6b6b6b", "muon": "#d1495b", "sem_muon": "#1b6ca8",
+         "instavel": "#edae49"}
+ROTULO = {"melhor": "melhor", "baseline": "baseline", "muon": "melhor c/ Muon",
+          "sem_muon": "melhor sem Muon", "instavel": "instável"}
+INSTAVEL_PADRAO = "muon_lr0.03_aw0.0003_warmup_cosseno_p3000_s0"
 CORES_OTIM = {"sgd": "#8c564b", "sgd_nesterov": "#e377c2", "adam": "#7f7f7f",
               "adamw": "#1b6ca8", "nadam": "#2ca02c", "muon": "#d1495b"}
 ROTULO_CAMADA = {treino.CAMADAS[0]: "primeira", treino.CAMADAS[1]: "meio",
@@ -98,8 +102,16 @@ def escolher(linhas, instavel=None):
                              r["id"]))
         instavel = max(cand)[1]
     rinst = next(r for r in linhas if r["id"] == instavel)
-    return dict(melhor=base_or(g[melhor]), baseline=base_or(base), muon=base_or(g[melhor_muon]),
-                instavel=rinst)
+    esc = dict(melhor=base_or(g[melhor]), baseline=base_or(base))
+    if melhor[0] == "muon":
+        # a melhor já é com Muon: no lugar dela, mostra a melhor SEM Muon para comparação
+        sem = max((c for c in com3 if c[0] != "muon" and c != ("adam", 1e-3, "", "constante")),
+                  key=lambda c: media(com3[c]))
+        esc["sem_muon"] = base_or(g[sem])
+    else:
+        esc["muon"] = base_or(g[melhor_muon])
+    esc["instavel"] = rinst
+    return esc
 
 
 def base_or(rs):
@@ -110,8 +122,7 @@ def pagina_sinais(pdf, esc):
     fig, ax = plt.subplots(5, 1, figsize=(11, 14), sharex=True)
     for k, r in esc.items():
         lg = ler_log(r["id"])
-        rot = {"melhor": "melhor", "baseline": "baseline", "muon": "melhor c/ Muon",
-               "instavel": "instável"}[k] + f": {nome_curto(r)}"
+        rot = ROTULO[k] + f": {nome_curto(r)}"
         c = CORES[k]
         p = lg["passo"]
         ax[0].plot(p, lg["perda_media"], color=c, lw=1.4, label=rot)
@@ -131,9 +142,11 @@ def pagina_sinais(pdf, esc):
     ax[2].set_ylabel("‖θ‖₂")
     ax[3].set_yscale("log")
     ax[3].set_ylabel("η_t\n(pontilhado: parte AdamW do Muon)")
+    ax[3].set_ylim(1e-6, 1e-1)
     ax[4].set_yscale("log")
     ax[4].axhline(1e-3, color="k", lw=0.6, ls="--")
     ax[4].set_ylabel("‖Δθ‖/‖θ‖\ncamada do meio")
+    ax[4].set_ylim(1e-6, 1e-1)
     ax[4].set_xlabel("passo")
     ax[0].legend(fontsize=8, loc="upper right")
     for a in ax:
@@ -146,8 +159,8 @@ def pagina_sinais(pdf, esc):
 
 
 def pagina_camadas(pdf, esc):
-    ks = ["melhor", "baseline", "muon", "instavel"]
-    fig, ax = plt.subplots(3, 4, figsize=(16, 10), sharex=True)
+    ks = list(esc)
+    fig, ax = plt.subplots(3, len(ks), figsize=(16, 10), sharex=True)
     for j, k in enumerate(ks):
         r = esc[k]
         lg = ler_log(r["id"])
@@ -156,10 +169,11 @@ def pagina_camadas(pdf, esc):
             ax[0, j].plot(p, lg[f"grad/{n}"], color=cor, lw=1, label=ROTULO_CAMADA[n])
             ax[1, j].plot(p, lg[f"theta/{n}"], color=cor, lw=1.2)
             ax[2, j].plot(p, lg[f"rho/{n}"], color=cor, lw=1)
-        ax[0, j].set_title(f"{k}\n{nome_curto(r)}", fontsize=9)
+        ax[0, j].set_title(f"{ROTULO[k]}\n{nome_curto(r)}", fontsize=9)
         ax[0, j].set_yscale("log")
         ax[2, j].set_yscale("log")
         ax[2, j].axhline(1e-3, color="k", lw=0.6, ls="--")
+        ax[2, j].set_ylim(bottom=1e-6)
         ax[2, j].set_xlabel("passo")
         for a in ax[:, j]:
             a.grid(alpha=0.3)
@@ -174,25 +188,26 @@ def pagina_camadas(pdf, esc):
 
 
 def pagina_eta(pdf, linhas):
-    fig, ax = plt.subplots(figsize=(11, 6.5))
-    for o in treino.OTIMIZADORES:
-        rs = sorted((r for r in linhas if r["etapa"] == "varredura" and r["otimizador"] == o),
-                    key=lambda r: r["lr"])
-        if not rs:
-            continue
-        x = [r["lr"] for r in rs]
-        y = [r["acc_val"] for r in rs]
-        ax.plot(x, y, "o-", color=CORES_OTIM[o], label=o + (" (η das matrizes)" if o == "muon"
-                                                          else ""))
-        for r in rs:
-            if r["divergiu"]:
-                ax.plot(r["lr"], r["acc_val"], "x", color=CORES_OTIM[o], ms=12, mew=2)
-    ax.set_xscale("log")
-    ax.set_xlabel("η (pico da agenda warmup + cosseno)")
-    ax.set_ylabel("acurácia de validação")
-    ax.set_title("Métrica × η por otimizador (varredura, semente 0; × = divergiu)")
-    ax.grid(alpha=0.3, which="both")
-    ax.legend()
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6.5))
+    for ax in axs:
+        for o in treino.OTIMIZADORES:
+            rs = sorted((r for r in linhas if r["etapa"] == "varredura"
+                         and r["otimizador"] == o), key=lambda r: r["lr"])
+            if not rs:
+                continue
+            ax.plot([r["lr"] for r in rs], [r["acc_val"] for r in rs], "o-",
+                    color=CORES_OTIM[o], label=o + (" (η das matrizes)" if o == "muon" else ""))
+            for r in rs:
+                if r["divergiu"]:
+                    ax.plot(r["lr"], r["acc_val"], "x", color=CORES_OTIM[o], ms=12, mew=2)
+        ax.set_xscale("log")
+        ax.set_xlabel("η (pico da agenda warmup + cosseno)")
+        ax.grid(alpha=0.3, which="both")
+    axs[0].set_ylabel("acurácia de validação")
+    axs[0].set_title("Métrica × η por otimizador (varredura, semente 0; × = divergiu)")
+    axs[0].legend()
+    axs[1].set_ylim(0.82, 0.895)
+    axs[1].set_title("Zoom na região útil (melhores η)")
     fig.tight_layout()
     pdf.savefig(fig)
     plt.close(fig)
@@ -241,20 +256,25 @@ def pagina_confirmacao(pdf, linhas):
     g = agrupar_sementes(linhas)
     com3 = {c: rs for c, rs in g.items() if len(rs) >= 3}
     ordem = sorted(com3, key=lambda c: -statistics.mean(r["acc_val"] for r in com3[c].values()))
-    fig, ax = plt.subplots(figsize=(11, 6))
-    for i, c in enumerate(ordem):
-        accs = [r["acc_val"] for r in com3[c].values()]
-        m, s = statistics.mean(accs), statistics.stdev(accs)
-        cor = CORES["baseline"] if c == ("adam", 1e-3, "", "constante") else CORES_OTIM[c[0]]
-        ax.errorbar(i, m, yerr=s, fmt="o", color=cor, capsize=6, ms=8)
-        ax.scatter([i] * len(accs), accs, color=cor, alpha=0.4, s=18)
-        ax.text(i + 0.08, m, f"{m:.4f} ± {s:.4f}", fontsize=9, va="center")
-    ax.set_xticks(range(len(ordem)))
-    ax.set_xticklabels([nome_curto(next(iter(com3[c].values()))).replace(", ", "\n")
-                        for c in ordem], fontsize=8)
-    ax.set_ylabel("acurácia de validação (3 sementes)")
-    ax.set_title("Confirmação: média ± desvio-padrão entre sementes (pontos = sementes)")
-    ax.grid(alpha=0.3)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6), gridspec_kw=dict(width_ratios=[4, 3]))
+    for ax, cs in ((axs[0], ordem), (axs[1], [c for c in ordem
+                                             if c != ("adam", 1e-3, "", "constante")])):
+        for i, c in enumerate(cs):
+            accs = [r["acc_val"] for r in com3[c].values()]
+            m, s = statistics.mean(accs), statistics.stdev(accs)
+            cor = (CORES["baseline"] if c == ("adam", 1e-3, "", "constante")
+                   else CORES_OTIM[c[0]])
+            ax.errorbar(i, m, yerr=s, fmt="o", color=cor, capsize=6, ms=8)
+            ax.scatter([i] * len(accs), accs, color=cor, alpha=0.4, s=18)
+            ax.text(i + 0.08, m, f"{m:.4f} ± {s:.4f}", fontsize=9, va="center")
+        ax.set_xticks(range(len(cs)))
+        ax.set_xticklabels([nome_curto(next(iter(com3[c].values()))).replace(", ", "\n")
+                            for c in cs], fontsize=8)
+        ax.set_xlim(-0.4, len(cs) - 0.2)
+        ax.grid(alpha=0.3)
+    axs[0].set_ylabel("acurácia de validação (3 sementes)")
+    axs[0].set_title("Confirmação: média ± desvio-padrão entre sementes (pontos = sementes)")
+    axs[1].set_title("Zoom nas 3 melhores combinações")
     fig.tight_layout()
     pdf.savefig(fig)
     plt.close(fig)
@@ -262,10 +282,11 @@ def pagina_confirmacao(pdf, linhas):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--instavel", default=None)
+    ap.add_argument("--instavel", default=INSTAVEL_PADRAO,
+                    help="id da execução instável; 'auto' escolhe a de maior max/mediana de ||g||")
     a = ap.parse_args()
     linhas = ler_experimentos()
-    esc = escolher(linhas, a.instavel)
+    esc = escolher(linhas, None if a.instavel == "auto" else a.instavel)
     for k, r in esc.items():
         print(f"{k:9s} {r['id']}  acc_val={r['acc_val']}  divergiu={r['divergiu']}")
     with PdfPages(os.path.join(AQUI, "painel.pdf")) as pdf:
